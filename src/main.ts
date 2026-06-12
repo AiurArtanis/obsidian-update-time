@@ -12,6 +12,7 @@ import {
   UpdateTimeOnEditSettings,
   UpdateTimeOnEditSettingsTab,
 } from './Settings';
+import { isTFile } from './utils';
 
 function isZh(): boolean {
   try {
@@ -57,8 +58,10 @@ export default class UpdateTimePlugin extends Plugin {
 
   // ─── Events ───────────────────────────────────────────────
 
+  private _debounceTimer: number | null = null;
+
   setupEventHandlers() {
-    // File created → write both created and updated
+    // File created — immediately set created + updated (on a short delay so metadata cache is ready)
     this.registerEvent(
       this.app.vault.on('create', (file) => {
         if (!(file instanceof TFile)) return;
@@ -67,7 +70,7 @@ export default class UpdateTimePlugin extends Plugin {
       }),
     );
 
-    // File renamed/moved → update the updated time
+    // File renamed/moved — update the updated time
     this.registerEvent(
       this.app.vault.on('rename', (file) => {
         if (!(file instanceof TFile)) return;
@@ -76,7 +79,7 @@ export default class UpdateTimePlugin extends Plugin {
       }),
     );
 
-    // File modified → conditional update
+    // File modified — conditional update
     this.registerEvent(
       this.app.vault.on('modify', (file) => {
         if (!(file instanceof TFile)) return;
@@ -85,7 +88,7 @@ export default class UpdateTimePlugin extends Plugin {
       }),
     );
 
-    // File switched away from → finalize timestamp
+    // File switched away from — finalize timestamp
     this.registerEvent(
       this.app.workspace.on('file-open', (file) => {
         if (
@@ -100,8 +103,34 @@ export default class UpdateTimePlugin extends Plugin {
         } else {
           this.lastActiveFile = null;
         }
+        // Also finalize all other open files when a new file opens
+        this.debouncedFinalizeAllOpen();
       }),
     );
+
+    // Active leaf changed → finalize all currently open notes
+    this.registerEvent(
+      this.app.workspace.on('active-leaf-change', () => {
+        this.log('TRIGGER FROM ACTIVE LEAF CHANGE');
+        this.debouncedFinalizeAllOpen();
+      }),
+    );
+  }
+
+  /** Debounced pass over every open Markdown file to write its mtime into frontmatter. */
+  private debouncedFinalizeAllOpen() {
+    if (this._debounceTimer !== null) {
+      window.clearTimeout(this._debounceTimer);
+    }
+    this._debounceTimer = window.setTimeout(() => {
+      this._debounceTimer = null;
+      this.app.workspace.iterateLeaves((leaf) => {
+        const view = leaf.view;
+        if (view instanceof MarkdownView && view.file) {
+          this.finalizeFileTimestamp(view.file);
+        }
+      });
+    }, 500);
   }
 
   // ─── Commands ─────────────────────────────────────────────
@@ -126,25 +155,32 @@ export default class UpdateTimePlugin extends Plugin {
   // ─── Handlers ─────────────────────────────────────────────
 
   async handleFileCreated(file: TFile) {
+    // The metadata cache may not be ready yet for a brand new file.
+    // Delay so that processFrontMatter sees the file in a settled state.
+    await sleep(500);
+
     if (await this.shouldFileBeIgnored(file)) return;
     if (this.processing.has(file.path)) return;
     this.processing.add(file.path);
 
     try {
+      const mDate = new Date();
+      const cDate = new Date(file.stat.ctime);
+
       await this.app.fileManager.processFrontMatter(
         file,
         (fm) => {
-          this.log('create - current fm:', fm);
           const createdKey = this.settings.headerCreated;
           const updatedKey = this.settings.headerUpdated;
-          const now = new Date();
 
           if (!fm[createdKey] && this.settings.enableCreateTime) {
-            fm[createdKey] = this.formatDate(new Date(file.stat.ctime));
+            fm[createdKey] = this.formatDate(cDate);
           }
-          fm[updatedKey] = this.formatDate(now);
+          if (!fm[updatedKey]) {
+            fm[updatedKey] = this.formatDate(mDate);
+          }
         },
-        { ctime: file.stat.ctime, mtime: file.stat.mtime },
+        { ctime: file.stat.ctime, mtime: mDate.getTime() },
       );
       this.refreshFileView(file);
     } catch (e: any) {
@@ -194,9 +230,8 @@ export default class UpdateTimePlugin extends Plugin {
       const thresholdMs = this.settings.modifiedThresholdMinutes * 60 * 1000;
 
       // Read current frontmatter value to decide whether to skip the threshold
-      let currentValue: string | undefined;
       const metadata = this.app.metadataCache.getFileCache(file);
-      currentValue = metadata?.frontmatter?.[this.settings.headerUpdated];
+      const currentValue = metadata?.frontmatter?.[this.settings.headerUpdated];
 
       // New file (no property yet) — always write; established file — obey threshold
       const isNew = !currentValue;
@@ -211,7 +246,7 @@ export default class UpdateTimePlugin extends Plugin {
           const createdKey = this.settings.headerCreated;
           const updatedKey = this.settings.headerUpdated;
 
-          // Fill created time when missing (like the original plugin does on first edit)
+          // Always fill created time when missing (like the original plugin does)
           if (!fm[createdKey] && this.settings.enableCreateTime) {
             fm[createdKey] = this.formatDate(new Date(file.stat.ctime));
           }
