@@ -1,10 +1,10 @@
 {
-	"id": "update-time-on-edit",
-	"name": "Update time on edit",
-	"version": "2.4.0",
-	"minAppVersion": "1.4.4",
-	"description": "Keep front matter in sync with the last edit time",
-	"author": "@beaussan",
-	"authorUrl": "https://github.com/beaussan",
-	"isDesktopOnly": false
+  "id": "obsidian-update-time",
+  "name": "Update Time",
+  "version": "3.0.0",
+  "minAppVersion": "1.4.4",
+  "description": "Event-driven front matter time tracking — update created/modified timestamps based on file system events without hash tables or polling.",
+  "author": "AiurArtanis",
+  "authorUrl": "https://github.com/AiurArtanis",
+  "isDesktopOnly": false
 }

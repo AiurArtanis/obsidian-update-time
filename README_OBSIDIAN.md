@@ -1,56 +1,43 @@
-## Obsidian Sample Plugin
+# 本仓库与源仓库的关系
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+## 源仓库
 
-This project uses Typescript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in Typescript Definition format, which contains TSDoc comments describing what it does.
+- **名称**: [beaussan/update-time-on-edit](https://github.com/beaussan/update-time-on-edit)
+- **作者**: @beaussan
+- **插件 ID**: `update-time-on-edit`
+- **最新版本**: v2.4.0
 
-**Note:** The Obsidian API is still in early alpha and is subject to change at any time!
+## 本仓库（Fork）
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Changes the default font color to red using `styles.css`.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open Sample Modal" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+- **名称**: [AiurArtanis/obsidian-update-time](https://github.com/AiurArtanis/obsidian-update-time)
+- **插件 ID**: `obsidian-update-time`（与源库不同，避免冲突）
+- **版本**: v3.0.0 起
 
-### First time developing plugins?
+## 主要差异
 
-Quick starting guide for new plugin devs:
+| 方面 | 源库 | 本 Fork |
+|------|------|---------|
+| 修改时间更新策略 | 定时轮询 / minMinutesBetweenSaves | 事件驱动 + 文件系统 mtime 阈值检测 |
+| 文件哈希表 | `fileHashMap` 存储全库文件 SHA-256 | 完全移除，不存储任何文件哈希 |
+| `data.json` 大小 | 数百 KB～数 MB（含全库哈希表） | 仅几百字节（纯设置） |
+| 批量更新全库 | 有 "Update all files" 按钮 | 移除（安全原因） |
+| 「创建时间」写入时机 | 文件修改时检测 | 文件创建事件时写入 |
+| 「修改时间」最终化 | 无 | 文件关闭/切走时以系统 mtime 覆盖 |
+| 手动命令 | 无 | 提供「更新当前笔记的修改时间」命令 |
+| 中文本地化 | 无 | 简体中文全界面本地化 |
+| 跨设备同步友好度 | 差（`data.json` 频繁冲突产生大量副本） | 好（`data.json` 几乎不变） |
 
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
+## 为什么 Fork
 
-### Releasing new releases
+源插件在 OneDrive/多设备同步场景下存在严重问题：
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments.
-- Publish the release.
+1. 每次编辑文件都会全量写入包含所有文件哈希的 `data.json`（体量数百 KB～数 MB）
+2. 多设备同步时频繁产生冲突副本（`data-{设备名}-{编号}.json`）
+3. 累积上千个副本文件，占用数十 MB 空间
 
-### Adding your plugin to the community plugin list
+本 Fork 通过移除哈希表 + 事件驱动的方式从根本上解决了这些问题，同时增加了中文本地化和手动命令等增强功能。
 
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+## 兼容性
 
-### How to use
-
-- Clone this repo.
-- `npm i` or `yarn` to install dependencies
-- `npm run dev` to start compilation in watch mode.
-
-### Manually installing the plugin
-
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
-
-### API Documentation
-
-See https://github.com/obsidianmd/obsidian-api
+- 本插件的插件 ID 与源库不同（`obsidian-update-time` vs `update-time-on-edit`），两者可以**同时安装**（但不推荐同时启用）。
+- 旧插件的 `data.json`（含 `fileHashMap`）**不会**被导入，迁移时只需重新配置设置。
