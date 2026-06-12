@@ -1,10 +1,11 @@
 {
   "id": "obsidian-update-time",
   "name": "Update Time",
-  "version": "3.0.0",
+  "version": "1.0.0",
   "minAppVersion": "1.4.4",
-  "description": "Event-driven front matter time tracking — update created/modified timestamps based on file system events without hash tables or polling.",
+  "description": "Automatically update front matter timestamps (created/modified) based on file system events. Event-driven, no hash tables, no polling.",
   "author": "AiurArtanis",
   "authorUrl": "https://github.com/AiurArtanis",
+  "fundingUrl": "",
   "isDesktopOnly": false
 }
