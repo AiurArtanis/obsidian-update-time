@@ -165,7 +165,6 @@ export default class UpdateTimePlugin extends Plugin {
 
     try {
       const mDate = new Date();
-      const cDate = new Date(file.stat.ctime);
 
       await this.app.fileManager.processFrontMatter(
         file,
@@ -173,12 +172,11 @@ export default class UpdateTimePlugin extends Plugin {
           const createdKey = this.settings.headerCreated;
           const updatedKey = this.settings.headerUpdated;
 
-          if (!fm[createdKey] && this.settings.enableCreateTime) {
-            fm[createdKey] = this.formatDate(cDate);
+          // Always overwrite: new file or duplicated/copied → both times = now
+          if (this.settings.enableCreateTime) {
+            fm[createdKey] = this.formatDate(mDate);
           }
-          if (!fm[updatedKey]) {
-            fm[updatedKey] = this.formatDate(mDate);
-          }
+          fm[updatedKey] = this.formatDate(mDate);
         },
         { ctime: file.stat.ctime, mtime: mDate.getTime() },
       );
